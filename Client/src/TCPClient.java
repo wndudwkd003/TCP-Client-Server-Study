@@ -1,7 +1,6 @@
 import java.io.*;
 import java.net.*;
-
-import static java.lang.Thread.sleep;
+import java.nio.charset.StandardCharsets;
 
 public class TCPClient {
     public static void main(String[] args) throws Exception {
@@ -11,42 +10,47 @@ public class TCPClient {
         // 서버에 연결
         Socket clientSocket = new Socket(serverHostname, serverPort);
 
-        Thread clientToServerThread = new Thread(() -> {
+        InputStream in = clientSocket.getInputStream();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+
+        Thread serverToClientThread = new Thread(() -> {
+            // 서버로부터 응답 수신
             while (true) {
                 try {
-                    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-                    String line = br.readLine();
-
-                    // 서버로 메시지 전송
-                    OutputStream out = clientSocket.getOutputStream();
-                    PrintWriter writer = new PrintWriter(out);
-
-                    writer.println(line);
-                    writer.flush();
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        clientToServerThread.start();
-
-        Thread serverToClient = new Thread(() -> {
-            while (true) {
-                try {
-                    // 서버로부터 응답 수신
-                    InputStream in = clientSocket.getInputStream();
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-                    if (!reader.readLine().equals("")) {
-                        String response = reader.readLine();
-                        System.out.println("Response from server: " + response);
+                    String response = reader.readLine();
+                    if (response == null) {
+                        // 서버와의 연결이 끊어진 경우
+                        System.out.println("Disconnected from server.");
+                        break;
                     }
+                    System.out.println("Response from server: " + response);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         });
-        serverToClient.start();
+
+        OutputStream out = clientSocket.getOutputStream();
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
+        Thread clientToServerThread = new Thread(() -> {
+            // 서버로 메시지 전송
+            while (true) {
+                try {
+                    String input = br.readLine();
+
+                    PrintWriter writer = new PrintWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8), true);
+
+                    writer.println(input);
+
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        clientToServerThread.start();
+        serverToClientThread.start();
 
     }
 }
